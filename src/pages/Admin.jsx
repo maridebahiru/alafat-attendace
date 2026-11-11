@@ -75,6 +75,17 @@ const Admin = () => {
     );
 };
 
+const NavSection = ({ title, children, showTitle }) => (
+    <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {showTitle && (
+            <div style={{ padding: '0 20px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', opacity: 0.5, letterSpacing: '1.5px', marginBottom: '8px' }}>
+                {title}
+            </div>
+        )}
+        {children}
+    </div>
+);
+
 const DashboardContent = ({ onLogout, showToast, toast }) => {
     const [students, setStudents] = useState([]);
     const [attendance, setAttendance] = useState([]);
@@ -556,17 +567,6 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
         }
     };
 
-    const NavSection = ({ title, children }) => (
-        <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {(isSidebarOpen || isMobileMenuOpen) && (
-                <div style={{ padding: '0 20px', fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', opacity: 0.5, letterSpacing: '1.5px', marginBottom: '8px' }}>
-                    {title}
-                </div>
-            )}
-            {children}
-        </div>
-    );
-
     const toggleSidebar = () => {
         if (window.innerWidth <= 768) {
             setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -609,7 +609,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
 
                 <nav style={{ flex: 1, padding: '0 12px', display: 'flex', flexDirection: 'column' }} className="custom-scroll">
                     {superAdmin && (
-                        <NavSection title="INTELLIGENCE">
+                        <NavSection title="INTELLIGENCE" showTitle={isSidebarOpen || isMobileMenuOpen}>
                             <TabButton 
                                 vertical icon={<LayoutDashboard size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Overview" : ""} 
                                 active={activeTab === 'overview'} onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} 
@@ -621,14 +621,14 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                         </NavSection>
                     )}
 
-                    <NavSection title="CONTROL">
+                    <NavSection title="CONTROL" showTitle={isSidebarOpen || isMobileMenuOpen}>
                         <TabButton 
                             vertical icon={<Camera size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Live Scanner" : ""} 
                             active={activeTab === 'scanner'} onClick={() => { setActiveTab('scanner'); setIsMobileMenuOpen(false); }} 
                         />
                     </NavSection>
 
-                    <NavSection title="MANAGEMENT">
+                    <NavSection title="MANAGEMENT" showTitle={isSidebarOpen || isMobileMenuOpen}>
                         <TabButton 
                             vertical icon={<Database size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Students" : ""} 
                             active={activeTab === 'data'} onClick={() => { setActiveTab('data'); setIsMobileMenuOpen(false); }} 

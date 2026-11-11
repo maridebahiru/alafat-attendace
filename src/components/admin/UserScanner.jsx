@@ -191,7 +191,6 @@ const UserScanner = ({ supabase = defaultSupabase, currentUser }) => {
                         style={{
                             padding: '12px 20px',
                             borderRadius: '8px',
-                            border: 'none',
                             backgroundColor: 'rgba(211, 162, 0, 0.2)',
                             color: '#d3a200',
                             border: '1px solid #d3a200',

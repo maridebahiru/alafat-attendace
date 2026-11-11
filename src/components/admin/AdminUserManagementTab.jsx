@@ -309,7 +309,7 @@ const AdminUserManagementTab = ({ students, onAdd, onUpdate, onDelete }) => {
                                 placeholder="e.g. 0912345678"
                                 value={formData.phone}
                                 onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '10px', backgroundColor: !!editingStudent ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
+                                style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '10px', backgroundColor: editingStudent ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
                             />
                         </div>
                     </div>

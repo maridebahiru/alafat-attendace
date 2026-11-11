@@ -4,42 +4,41 @@ import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import QRCard from '../components/QRCard';
 import html2canvas from 'html2canvas';
-import { cleanChristianName } from '../utils/studentUtils';
 import logo from '../assets/logo.png';
+import singerLogo from '../assets/singer_logo.png';
 import { User, Phone, Mail, Building, Briefcase, Download, LogOut, CheckCircle, Calendar, Shield, IdCard } from 'lucide-react';
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const cardRef = useRef(null);
-    const [student, setStudent] = useState(null);
+    const [student, setStudent] = useState(() => {
+        try {
+            const stored = sessionStorage.getItem('currentStudent');
+            return stored ? JSON.parse(stored) : null;
+        } catch {
+            return null;
+        }
+    });
     const [myAttendance, setMyAttendance] = useState([]);
     const [downloading, setDownloading] = useState(false);
 
     useEffect(() => {
-        const stored = sessionStorage.getItem('currentStudent');
-        if (!stored) {
+        if (!student) {
             navigate('/');
             return;
         }
 
-        try {
-            const parsed = JSON.parse(stored);
-            setStudent(parsed);
-
-            // Real-time listener for student's attendance records
-            if (parsed.phone) {
-                const q = query(collection(db, "attendance"), where("phone", "==", parsed.phone));
-                const unsub = onSnapshot(q, (snapshot) => {
-                    const records = snapshot.docs.map(doc => doc.data());
-                    records.sort((a, b) => (b.scannedAt?.seconds || 0) - (a.scannedAt?.seconds || 0));
-                    setMyAttendance(records);
-                });
-                return () => unsub();
-            }
-        } catch (e) {
-            navigate('/');
+        // Real-time listener for student's attendance records
+        if (student.phone) {
+            const q = query(collection(db, "attendance"), where("phone", "==", student.phone));
+            const unsub = onSnapshot(q, (snapshot) => {
+                const records = snapshot.docs.map(doc => doc.data());
+                records.sort((a, b) => (b.scannedAt?.seconds || 0) - (a.scannedAt?.seconds || 0));
+                setMyAttendance(records);
+            });
+            return () => unsub();
         }
-    }, [navigate]);
+    }, [navigate, student]);
 
     const handleLogout = () => {
         sessionStorage.removeItem('currentStudent');
@@ -83,12 +82,16 @@ const Dashboard = () => {
                 zIndex: 100
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <img src={logo} alt="Logo" style={{ height: '45px', objectFit: 'contain' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <img src={logo} alt="Logo" style={{ height: '45px', objectFit: 'contain' }} />
+                        <div style={{ width: '1px', height: '30px', backgroundColor: 'rgba(211, 162, 0, 0.25)' }} />
+                        <img src={singerLogo} alt="Singer Logo" style={{ height: '45px', objectFit: 'contain' }} />
+                    </div>
                     <div>
                         <h1 style={{ color: '#d3a200', fontSize: '1.1rem', margin: 0, fontWeight: '800' }}>
                             የኢትዮጵያዊው ጃንደረባ ትውልድ
                         </h1>
-                        <span style={{ fontSize: '12px', opacity: 0.7 }}>Student Dashboard</span>
+                        <span style={{ fontSize: '12px', opacity: 0.7 }}>Singer Attendance Dashboard</span>
                     </div>
                 </div>
 

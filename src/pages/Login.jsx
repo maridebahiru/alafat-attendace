@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getStudentByIdentifier, ensureQrToken } from '../utils/studentUtils';
 import logo from '../assets/logo.png';
+import singerLogo from '../assets/singer_logo.png';
 import { ArrowRight } from 'lucide-react';
 
 const Login = () => {
@@ -62,8 +63,16 @@ const Login = () => {
                 textAlign: 'center'
             }}>
                 {/* Logo & Header */}
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                    <img src={logo} alt="Logo" style={{ height: '80px', objectFit: 'contain' }} />
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '20px',
+                    marginBottom: '20px'
+                }}>
+                    <img src={logo} alt="Logo" style={{ height: '80px', maxWidth: '120px', objectFit: 'contain' }} />
+                    <div style={{ width: '1px', height: '55px', backgroundColor: 'rgba(211, 162, 0, 0.25)' }} />
+                    <img src={singerLogo} alt="Singer Logo" style={{ height: '80px', maxWidth: '120px', objectFit: 'contain' }} />
                 </div>
 
                 <h2 style={{
@@ -76,7 +85,7 @@ const Login = () => {
                     ኢጃት ድሬ
                 </h2>
                 <p style={{ color: '#f5e6c8', opacity: 0.8, fontSize: '0.9rem', marginBottom: '30px' }}>
-                    Student Attendance Portal Login
+                    Singer Attendance Portal
                 </p>
 
                 {/* Login Form */}

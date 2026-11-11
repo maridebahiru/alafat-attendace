@@ -2,6 +2,7 @@ import React, { forwardRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Phone } from 'lucide-react';
 import footerImg from '../assets/ELFAZ-01 (2).png';
+import singerLogo from '../assets/singer_logo.png';
 import { cleanChristianName } from '../utils/studentUtils';
 
 const QRCard = forwardRef(({ studentData, logo }, ref) => {
@@ -53,12 +54,17 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                 }} />
 
                 {/* Logo Section */}
-                <div style={{ marginTop: '5px', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <div style={{ marginTop: '5px', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px' }}>
                     <img
                         src={logo || "/logo.png"}
                         alt="Logo"
-                        style={{ width: '70px', height: '70px', objectFit: 'contain' }}
+                        style={{ width: '60px', height: '60px', objectFit: 'contain' }}
                         onError={(e) => { e.target.src = "https://placehold.co/85x85/65081b/d3a200?text=Logo"; }}
+                    />
+                    <img
+                        src={singerLogo}
+                        alt="Singer Logo"
+                        style={{ width: '60px', height: '60px', objectFit: 'contain' }}
                     />
                 </div>
 
