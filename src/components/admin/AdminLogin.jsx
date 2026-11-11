@@ -1,9 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Lock, Shield, User, Key } from 'lucide-react';
 
-const DEFAULT_ADMIN_EMAIL = "maramawitdereje93@gmail.com";
+const SUPERADMINS = [
+    {
+        username: "maramawit@gmail.com",
+        password: "maramawit@1221",
+        role: "superadmin",
+        name: "Maramawit (Super Admin)"
+    },
+    {
+        username: "maramawitdereje93@gmail.com",
+        password: "maramawitdereje93@gmail.com",
+        role: "superadmin",
+        name: "Default Administrator"
+    }
+];
 
 const AdminLogin = ({ onLoginSuccess }) => {
     const [username, setUsername] = useState('');
@@ -24,6 +37,28 @@ const AdminLogin = ({ onLoginSuccess }) => {
         return () => clearInterval(timer);
     }, [countdown]);
 
+    // Ensure super admin account is initialized in Firestore
+    useEffect(() => {
+        const seedSuperAdmin = async () => {
+            try {
+                const superAdminDocRef = doc(db, 'admins', 'maramawit@gmail.com');
+                const snap = await getDoc(superAdminDocRef);
+                if (!snap.exists()) {
+                    await setDoc(superAdminDocRef, {
+                        username: 'maramawit@gmail.com',
+                        password: 'maramawit@1221',
+                        role: 'superadmin',
+                        name: 'Maramawit (Super Admin)',
+                        createdAt: serverTimestamp()
+                    });
+                }
+            } catch (err) {
+                console.warn('[AdminLogin] Super admin seeding check:', err);
+            }
+        };
+        seedSuperAdmin();
+    }, []);
+
     const handleLogin = async (e) => {
         e.preventDefault();
         if (isLocked) return;
@@ -34,30 +69,60 @@ const AdminLogin = ({ onLoginSuccess }) => {
         const inputPass = password.trim();
 
         try {
-            // Query Firestore 'admins' collection
-            const adminsCol = collection(db, 'admins');
-            const q = query(adminsCol, where('username', '==', inputUser));
-            const querySnap = await getDocs(q);
-
             let authenticatedAdmin = null;
 
-            if (!querySnap.empty) {
-                const adminDoc = querySnap.docs[0].data();
-                // Compare provided password with admin record (hashed or matching record)
-                if (adminDoc.password === inputPass || adminDoc.passwordHash === inputPass) {
-                    authenticatedAdmin = {
-                        username: inputUser,
-                        role: adminDoc.role || 'superadmin',
-                        name: adminDoc.name || inputUser
-                    };
-                }
-            } else if (inputUser === DEFAULT_ADMIN_EMAIL.toLowerCase() && inputPass === DEFAULT_ADMIN_EMAIL) {
-                // Fallback default superadmin login
+            // 1. Direct match with configured Super Admins
+            const directSuperAdminMatch = SUPERADMINS.find(
+                sa => sa.username.toLowerCase() === inputUser && sa.password === inputPass
+            );
+            if (directSuperAdminMatch) {
                 authenticatedAdmin = {
-                    username: DEFAULT_ADMIN_EMAIL,
+                    username: directSuperAdminMatch.username,
                     role: 'superadmin',
-                    name: 'Default Administrator'
+                    name: directSuperAdminMatch.name
                 };
+                // Ensure synced to Firestore
+                try {
+                    await setDoc(doc(db, 'admins', directSuperAdminMatch.username), {
+                        username: directSuperAdminMatch.username,
+                        password: directSuperAdminMatch.password,
+                        name: directSuperAdminMatch.name,
+                        role: 'superadmin',
+                        createdAt: serverTimestamp()
+                    }, { merge: true });
+                } catch {
+                    // ignore if network unavailable
+                }
+            }
+
+            // 2. Query Firestore 'admins' collection
+            if (!authenticatedAdmin) {
+                const adminsCol = collection(db, 'admins');
+                const q = query(adminsCol, where('username', '==', inputUser));
+                const querySnap = await getDocs(q);
+
+                if (!querySnap.empty) {
+                    const adminDoc = querySnap.docs[0].data();
+                    if (adminDoc.password === inputPass || adminDoc.passwordHash === inputPass) {
+                        authenticatedAdmin = {
+                            username: inputUser,
+                            role: adminDoc.role || 'superadmin',
+                            name: adminDoc.name || inputUser
+                        };
+                    }
+                } else {
+                    const directDoc = await getDoc(doc(db, 'admins', inputUser));
+                    if (directDoc.exists()) {
+                        const adminDoc = directDoc.data();
+                        if (adminDoc.password === inputPass || adminDoc.passwordHash === inputPass) {
+                            authenticatedAdmin = {
+                                username: inputUser,
+                                role: adminDoc.role || 'superadmin',
+                                name: adminDoc.name || inputUser
+                            };
+                        }
+                    }
+                }
             }
 
             if (authenticatedAdmin) {
@@ -81,9 +146,12 @@ const AdminLogin = ({ onLoginSuccess }) => {
             }
         } catch (err) {
             console.error("Admin login error:", err);
-            // Fallback match check
-            if (inputUser === DEFAULT_ADMIN_EMAIL.toLowerCase() && inputPass === DEFAULT_ADMIN_EMAIL) {
-                const fallbackAdmin = { username: DEFAULT_ADMIN_EMAIL, role: 'superadmin', name: 'Super Admin' };
+            // Fallback match check for offline/interrupted scenarios
+            const fallbackMatch = SUPERADMINS.find(
+                sa => sa.username.toLowerCase() === inputUser && sa.password === inputPass
+            );
+            if (fallbackMatch) {
+                const fallbackAdmin = { username: fallbackMatch.username, role: 'superadmin', name: fallbackMatch.name };
                 sessionStorage.setItem('isAdminAuth', 'true');
                 sessionStorage.setItem('adminUser', JSON.stringify(fallbackAdmin));
                 onLoginSuccess();
@@ -134,7 +202,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
                         <input
                             type="text"
                             required
-                            placeholder="admin@example.com"
+                            placeholder="maramawit@gmail.com"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             disabled={isLocked}

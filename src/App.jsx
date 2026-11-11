@@ -13,6 +13,7 @@ function App() {
           <Route path="/" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/bulk-upload" element={<Admin defaultTab="bulk-upload" />} />
           <Route path="/register" element={<Generator />} />
         </Routes>
       </div>

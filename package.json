@@ -7,7 +7,9 @@
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview --host 0.0.0.0 --port 3000"
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "deploy": "npm run build && npx -y firebase-tools deploy --only hosting",
+    "deploy:rules": "npx -y firebase-tools deploy --only firestore:rules"
   },
   "dependencies": {
     "@babel/runtime": "^8.0.0",

@@ -5,7 +5,8 @@ import {
     serverTimestamp, deleteDoc, getDocs, writeBatch, query, where
 } from 'firebase/firestore';
 import { Html5Qrcode } from 'html5-qrcode';
-import { LogOut, LayoutDashboard, Database, Camera, Users, Calendar, Menu, X, ChevronRight, AlertCircle, UserCheck, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { LogOut, LayoutDashboard, Database, Camera, Users, Calendar, Menu, X, ChevronRight, AlertCircle, UserCheck, RefreshCw, Wifi, WifiOff, Upload } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { saveStudentsLocal, getStudentsLocal, isAlreadyCheckedInLocal, markCheckedInLocal, queuePendingAttendance } from '../utils/offlineStorage';
 import { subscribeSyncState, syncPendingAttendance, getNetworkStatus } from '../utils/syncManager';
@@ -18,33 +19,26 @@ import AdminDateAnalysisTab from '../components/admin/AdminDateAnalysisTab';
 import AdminUserManagementTab from '../components/admin/AdminUserManagementTab';
 import AdminAnalyticsModal from '../components/admin/AdminAnalyticsModal';
 import AdminScannedIDModal from '../components/admin/AdminScannedIDModal';
-import AdminLocationGate from '../components/admin/AdminLocationGate';
+import BulkMemberUpload from '../components/admin/BulkMemberUpload';
 import { TabButton } from '../components/admin/AdminShared';
 import { getStudentByQrToken, getStudentByIdentifier, cleanScannedToken } from '../utils/studentUtils';
 import { exportToCSV, exportTotalAttendedExcel } from '../utils/exportUtils';
 import { checkPermission, logSuperAdminAudit, getUserRole, isSuperAdmin } from '../utils/rbac';
-import { isLocationVerifiedSession, clearLocationSession, getLocationAuditLog } from '../utils/locationService';
 
-const Admin = () => {
+const Admin = ({ defaultTab }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(
         sessionStorage.getItem('isAdminAuth') === 'true'
-    );
-    const [isLocationVerified, setIsLocationVerified] = useState(
-        isLocationVerifiedSession()
     );
     const [toast, setToast] = useState(null);
 
     const handleLoginSuccess = () => {
         setIsAuthenticated(true);
-        setIsLocationVerified(isLocationVerifiedSession());
     };
 
     const handleLogout = () => {
         sessionStorage.removeItem('isAdminAuth');
         sessionStorage.removeItem('adminUser');
-        clearLocationSession();
         setIsAuthenticated(false);
-        setIsLocationVerified(false);
     };
 
     const showToast = (msg, type = 'success') => {
@@ -57,21 +51,12 @@ const Admin = () => {
     }
 
     return (
-        <>
-            <DashboardContent
-                onLogout={handleLogout}
-                showToast={showToast}
-                toast={toast}
-            />
-            {!isLocationVerified && (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
-                    <AdminLocationGate 
-                        onVerified={() => setIsLocationVerified(true)} 
-                        onLogout={handleLogout} 
-                    />
-                </div>
-            )}
-        </>
+        <DashboardContent
+            onLogout={handleLogout}
+            showToast={showToast}
+            toast={toast}
+            defaultTab={defaultTab}
+        />
     );
 };
 
@@ -86,14 +71,18 @@ const NavSection = ({ title, children, showTitle }) => (
     </div>
 );
 
-const DashboardContent = ({ onLogout, showToast, toast }) => {
+const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [students, setStudents] = useState([]);
     const [attendance, setAttendance] = useState([]);
     const [isScannerActive, setIsScannerActive] = useState(false);
     const [isGreenFlash, setIsGreenFlash] = useState(false);
     const [scanner, setScanner] = useState(null);
     const superAdmin = isSuperAdmin();
-    const [activeTab, setActiveTab] = useState(superAdmin ? 'overview' : 'scanner');
+    const [activeTab, setActiveTab] = useState(
+        defaultTab || searchParams.get('tab') || (superAdmin ? 'overview' : 'scanner')
+    );
     const [selectedStudentForAnalytics, setSelectedStudentForAnalytics] = useState(null);
     const [lastScannedResult, setLastScannedResult] = useState(null);
     const [scannedModalData, setScannedModalData] = useState(null);
@@ -417,7 +406,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 scannedAt: new Date().toISOString(),
                 scannedBy: adminIdentity,
                 deviceInfo: deviceInfoStr,
-                scannedLocation: getLocationAuditLog()
+                scannedLocation: null
             };
 
             // Mark locally in IndexedDB immediately to prevent double scanning offline or online
@@ -490,7 +479,7 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                 scannedAt: serverTimestamp(),
                 scannedBy: adminIdentity,
                 deviceInfo: deviceInfoStr,
-                scannedLocation: getLocationAuditLog()
+                scannedLocation: null
             });
             showToast(`✅ Manually Checked in: ${student.name}`);
         } catch (e) {
@@ -632,6 +621,10 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                         <TabButton 
                             vertical icon={<Database size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Students" : ""} 
                             active={activeTab === 'data'} onClick={() => { setActiveTab('data'); setIsMobileMenuOpen(false); }} 
+                        />
+                        <TabButton 
+                            vertical icon={<Upload size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Bulk Upload" : ""} 
+                            active={activeTab === 'bulk-upload'} onClick={() => { setActiveTab('bulk-upload'); setIsMobileMenuOpen(false); }} 
                         />
                         {superAdmin && (
                             <TabButton 
@@ -799,6 +792,17 @@ const DashboardContent = ({ onLogout, showToast, toast }) => {
                             onAdd={handleAddStudent}
                             onUpdate={handleUpdateStudent}
                             onDelete={handleDeleteStudent}
+                        />
+                    )}
+                    {activeTab === 'bulk-upload' && (
+                        <BulkMemberUpload 
+                            onNavigateToGenerator={(createdMembers) => {
+                                if (createdMembers && createdMembers.length > 0) {
+                                    sessionStorage.setItem('bulkCreatedMembers', JSON.stringify(createdMembers));
+                                    showToast(`Loaded ${createdMembers.length} newly created members for ID card generation!`);
+                                }
+                                navigate('/register');
+                            }}
                         />
                     )}
                     {activeTab === 'date' && superAdmin && <AdminDateAnalysisTab students={students} attendance={attendance} />}

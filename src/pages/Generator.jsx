@@ -72,6 +72,15 @@ const Generator = () => {
         link.click();
     };
 
+    const [bulkMembers, setBulkMembers] = useState(() => {
+        try {
+            const raw = sessionStorage.getItem('bulkCreatedMembers');
+            return raw ? JSON.parse(raw) : [];
+        } catch {
+            return [];
+        }
+    });
+
     const resetForm = () => {
         setStudentData(null);
         setFormData({
@@ -132,6 +141,66 @@ const Generator = () => {
             >
                 <ArrowLeft size={18} /> Back to Login
             </button>
+
+            {/* Quick Card Selector for Bulk Created Members */}
+            {bulkMembers.length > 0 && (
+                <div style={{
+                    marginBottom: '24px',
+                    padding: '16px 20px',
+                    borderRadius: '12px',
+                    backgroundColor: 'rgba(211, 162, 0, 0.1)',
+                    border: '1px solid var(--accent-gold)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: '800', color: 'var(--accent-gold)', fontSize: '14px' }}>
+                            ✨ Bulk Upload Batch: {bulkMembers.length} Members Ready for ID Cards
+                        </span>
+                        <button
+                            onClick={() => {
+                                sessionStorage.removeItem('bulkCreatedMembers');
+                                setBulkMembers([]);
+                            }}
+                            style={{ background: 'transparent', border: 'none', color: '#ff4d4d', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', maxHeight: '130px', overflowY: 'auto' }}>
+                        {bulkMembers.map((m, idx) => (
+                            <button
+                                key={m.memberId || idx}
+                                type="button"
+                                onClick={() => {
+                                    setStudentData({
+                                        name: m.fullName,
+                                        phone: m.phone || '0900000000',
+                                        employeeId: m.memberId,
+                                        idNo: m.displayId || m.memberId,
+                                        department: m.group || 'Choir',
+                                        position: 'Member',
+                                        qrToken: m.memberId
+                                    });
+                                }}
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(211,162,0,0.3)',
+                                    backgroundColor: 'rgba(0,0,0,0.3)',
+                                    color: 'var(--text-primary)',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: '600'
+                                }}
+                            >
+                                {m.displayId || m.memberId} - {m.fullName}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div style={{ textAlign: 'center', marginBottom: '30px' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>

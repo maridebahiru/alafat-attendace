@@ -1,6 +1,37 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email in ["maramawit@gmail.com", "maramawitdereje93@gmail.com"] ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.role in ['admin', 'superadmin']
+      );
+    }
+
+    // Member counter used by reserveMemberIdBatch transaction
+    match /counters/members {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Members collection: stores bulk uploaded members with JY prefix IDs
+    match /members/{memberId} {
+      // Read allowed for scanner lookup, attendance, and member search
+      allow read: if true;
+      // Creation and updates: requires valid member data fields
+      allow create: if request.resource.data.fullName is string &&
+                       request.resource.data.gender in ['Male', 'Female'];
+      allow update, delete: if true;
+    }
+
+    // Default rules for students, attendance, admins, audit logs
     match /{document=**} {
       allow read, write: if true;
     }
