@@ -202,7 +202,6 @@ const AdminLogin = ({ onLoginSuccess }) => {
                         <input
                             type="text"
                             required
-                            placeholder="maramawit@gmail.com"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             disabled={isLocked}
@@ -218,7 +217,6 @@ const AdminLogin = ({ onLoginSuccess }) => {
                         <input
                             type="password"
                             required
-                            placeholder="Enter Password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             disabled={isLocked}

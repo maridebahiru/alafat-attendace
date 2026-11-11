@@ -15,7 +15,7 @@ const Login = () => {
         e.preventDefault();
         setError('');
         if (!identifier.trim()) {
-            setError('Please enter your Phone Number or ID');
+            setError('Please enter your Singer ID');
             return;
         }
 
@@ -23,7 +23,7 @@ const Login = () => {
         try {
             const student = await getStudentByIdentifier(identifier);
             if (!student) {
-                setError('No student found matching this Phone Number or ID. Please verify or register via the official registration form.');
+                setError('No singer found matching this ID. Please verify your Singer ID.');
                 setLoading(false);
                 return;
             }
@@ -92,7 +92,7 @@ const Login = () => {
                 <form onSubmit={handleLogin}>
                     <div style={{ textAlign: 'left', marginBottom: '20px' }}>
                         <label style={{ display: 'block', color: '#d3a200', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>
-                            Phone Number or ID
+                            Singer ID
                         </label>
                         <div style={{ position: 'relative' }}>
                             <input
@@ -100,7 +100,7 @@ const Login = () => {
                                 required
                                 value={identifier}
                                 onChange={(e) => setIdentifier(e.target.value)}
-                                placeholder="e.g. 0911223344 or JY001 / JY 001"
+                                placeholder="e.g. JY001 or JY 001"
                                 style={{
                                     width: '100%',
                                     padding: '14px 16px',
