@@ -699,15 +699,17 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
                             vertical icon={<Database size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Students" : ""} 
                             active={activeTab === 'data'} onClick={() => { setActiveTab('data'); setIsMobileMenuOpen(false); }} 
                         />
-                        <TabButton 
-                            vertical icon={<Upload size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Bulk Upload" : ""} 
-                            active={activeTab === 'bulk-upload'} onClick={() => { setActiveTab('bulk-upload'); setIsMobileMenuOpen(false); }} 
-                        />
                         {superAdmin && (
-                            <TabButton 
-                                vertical icon={<Users size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Users" : ""} 
-                                active={activeTab === 'users'} onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} 
-                            />
+                            <>
+                                <TabButton 
+                                    vertical icon={<Upload size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Bulk Upload" : ""} 
+                                    active={activeTab === 'bulk-upload'} onClick={() => { setActiveTab('bulk-upload'); setIsMobileMenuOpen(false); }} 
+                                />
+                                <TabButton 
+                                    vertical icon={<Users size={20} />} label={(isSidebarOpen || isMobileMenuOpen) ? "Users" : ""} 
+                                    active={activeTab === 'users'} onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} 
+                                />
+                            </>
                         )}
                     </NavSection>
                 </nav>
@@ -871,7 +873,7 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
                             onDelete={handleDeleteStudent}
                         />
                     )}
-                    {activeTab === 'bulk-upload' && (
+                    {activeTab === 'bulk-upload' && superAdmin && (
                         <BulkMemberUpload 
                             onNavigateToGenerator={(createdMembers) => {
                                 if (createdMembers && createdMembers.length > 0) {

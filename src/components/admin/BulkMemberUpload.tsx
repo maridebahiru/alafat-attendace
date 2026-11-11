@@ -9,7 +9,7 @@ import {
     downloadImportReportCSV
 } from '../../utils/parseMembersExcel';
 import { importMembersToFirestore, ImportProgress, CreatedMemberSummary } from '../../utils/importMembersBatch';
-import { isAdminOrSuperAdmin } from '../../utils/rbac';
+import { isSuperAdmin } from '../../utils/rbac';
 import { useNavigate } from 'react-router-dom';
 
 interface BulkMemberUploadProps {
@@ -19,7 +19,7 @@ interface BulkMemberUploadProps {
 
 export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateToGenerator, onImportSuccess }) => {
     const navigate = useNavigate();
-    const hasAdminAccess = isAdminOrSuperAdmin();
+    const hasSuperAdminAccess = isSuperAdmin();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [fileName, setFileName] = useState<string>('');
@@ -206,8 +206,8 @@ export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateTo
         }
     };
 
-    // RBAC Guard check
-    if (!hasAdminAccess) {
+    // RBAC Guard check - Strictly Super Admin only
+    if (!hasSuperAdminAccess) {
         return (
             <div style={{
                 padding: '40px 20px',
@@ -218,9 +218,9 @@ export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateTo
                 color: '#ff4d4d'
             }}>
                 <ShieldAlert size={48} style={{ margin: '0 auto 16px' }} />
-                <h3 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>Admin Access Required</h3>
+                <h3 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>Super Admin Access Required</h3>
                 <p style={{ opacity: 0.8, fontSize: '14px' }}>
-                    Bulk upload is strictly reserved for authorized administrators. Please log in with admin privileges.
+                    Bulk upload is strictly reserved for Super Administrators. Standard admin accounts cannot access bulk upload.
                 </p>
             </div>
         );
