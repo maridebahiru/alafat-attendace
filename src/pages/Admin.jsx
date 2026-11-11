@@ -108,11 +108,69 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
     }, []);
 
     // One-time student fetch function reusable by manual refresh & mutations
+    // Fetches both `students` and `members` collections to ensure bulk-uploaded singers appear
     const fetchStudents = async () => {
         try {
-            const q = collection(db, "students");
-            const snap = await getDocs(q);
-            const list = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+            const list = [];
+            const seenIds = new Set();
+
+            // 1. Fetch from students collection
+            try {
+                const snapStudents = await getDocs(collection(db, "students"));
+                snapStudents.docs.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const primaryId = data.memberId || data.employeeId || data.idNo || (data.phone ? data.phone : docSnap.id);
+                    const record = {
+                        docId: docSnap.id,
+                        ...data,
+                        name: data.name || data.fullName || 'Member',
+                        fullName: data.fullName || data.name || 'Member',
+                        employeeId: primaryId,
+                        idNo: data.idNo || primaryId,
+                        memberId: data.memberId || primaryId,
+                        phone: data.phone ? String(data.phone).trim() : '',
+                        department: data.group || data.department || 'Choir',
+                        position: data.position || 'Singer'
+                    };
+                    seenIds.add(String(primaryId).toLowerCase());
+                    seenIds.add(String(docSnap.id).toLowerCase());
+                    list.push(record);
+                });
+            } catch (err) {
+                console.warn('[Admin] Firestore fetch students error:', err);
+            }
+
+            // 2. Fetch from members collection to include all bulk-uploaded members
+            try {
+                const snapMembers = await getDocs(collection(db, "members"));
+                snapMembers.docs.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const primaryId = data.memberId || data.employeeId || data.idNo || docSnap.id;
+                    const lookupKey = String(primaryId).toLowerCase();
+                    const docKey = String(docSnap.id).toLowerCase();
+
+                    if (!seenIds.has(lookupKey) && !seenIds.has(docKey)) {
+                        seenIds.add(lookupKey);
+                        seenIds.add(docKey);
+                        list.push({
+                            docId: docSnap.id,
+                            ...data,
+                            name: data.fullName || data.name || 'Member',
+                            fullName: data.fullName || data.name || 'Member',
+                            employeeId: primaryId,
+                            idNo: data.idNo || primaryId,
+                            memberId: data.memberId || primaryId,
+                            phone: data.phone ? String(data.phone).trim() : '',
+                            department: data.group || data.department || 'Choir',
+                            position: data.position || 'Singer',
+                            profilePhotoUrl: data.photoUrl || data.profilePhotoUrl || ''
+                        });
+                    }
+                });
+            } catch (err) {
+                console.warn('[Admin] Firestore fetch members error:', err);
+            }
+
             setStudents(list);
             await saveStudentsLocal(list);
             return list;
@@ -298,14 +356,21 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
         try {
             console.log('[ULTRA-FAST SCANNER] Processing scan token:', textStr);
             const lowerStr = textStr.toLowerCase();
+            const cleanToken = textStr.replace(/\s+/g, '').toLowerCase();
 
             // STEP 1: INSTANT IN-MEMORY LOOKUP (0ms network delay)
             let targetStudent = students.find(s => {
                 const phone = String(s.phone || '').trim().toLowerCase();
-                const empId = String(s.employeeId || s.idNo || '').trim().toLowerCase();
+                const empId = String(s.employeeId || s.idNo || s.memberId || '').trim().toLowerCase();
+                const cleanEmp = empId.replace(/\s+/g, '');
                 const qrTok = String(s.qrToken || '').trim().toLowerCase();
                 const docId = String(s.docId || s.id || '').trim().toLowerCase();
-                return phone === lowerStr || empId === lowerStr || qrTok === lowerStr || docId === lowerStr;
+                const cleanDoc = docId.replace(/\s+/g, '');
+
+                return (phone && phone === lowerStr) ||
+                       empId === lowerStr || cleanEmp === cleanToken ||
+                       qrTok === lowerStr || qrTok === cleanToken ||
+                       docId === lowerStr || cleanDoc === cleanToken;
             });
 
             // STEP 2: JSON payload string parsing (In-Memory)
@@ -314,21 +379,26 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
                     const jsonStart = textStr.indexOf('{');
                     const jsonEnd = textStr.lastIndexOf('}');
                     const data = JSON.parse(textStr.substring(jsonStart, jsonEnd + 1));
-                    const identifier = cleanScannedToken(data.phone || data.idNo || data.employeeId || data.t || data.qrToken).toLowerCase();
+                    const identifier = cleanScannedToken(data.phone || data.idNo || data.employeeId || data.memberId || data.t || data.qrToken).toLowerCase();
+                    const cleanIdentifier = identifier.replace(/\s+/g, '');
                     if (identifier) {
                         targetStudent = students.find(s => {
                             const phone = String(s.phone || '').trim().toLowerCase();
-                            const empId = String(s.employeeId || s.idNo || '').trim().toLowerCase();
+                            const empId = String(s.employeeId || s.idNo || s.memberId || '').trim().toLowerCase();
+                            const cleanEmp = empId.replace(/\s+/g, '');
                             const qrTok = String(s.qrToken || '').trim().toLowerCase();
-                            return phone === identifier || empId === identifier || qrTok === identifier;
+                            return (phone && phone === identifier) ||
+                                   empId === identifier || cleanEmp === cleanIdentifier ||
+                                   qrTok === identifier || qrTok === cleanIdentifier;
                         });
                     }
-                    if (!targetStudent && (data.name || data.phone)) {
+                    if (!targetStudent && (data.name || data.fullName || data.phone || data.idNo || data.employeeId)) {
                         targetStudent = {
-                            name: data.name || 'Attendee',
-                            phone: data.phone || data.idNo || 'N/A',
-                            employeeId: data.idNo || data.employeeId || 'N/A',
-                            department: data.department || 'General'
+                            name: data.name || data.fullName || 'Attendee',
+                            phone: data.phone || '',
+                            employeeId: data.employeeId || data.idNo || data.memberId || 'N/A',
+                            idNo: data.idNo || data.employeeId || 'N/A',
+                            department: data.department || data.group || 'General'
                         };
                     }
                 } catch (e) {}
@@ -346,8 +416,8 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
                 } catch (err) {}
             }
 
-            // Unrecognized token handling
-            if (!targetStudent || !targetStudent.phone) {
+            // Unrecognized token handling: accept member if they have an ID or name
+            if (!targetStudent || (!targetStudent.phone && !targetStudent.employeeId && !targetStudent.idNo && !targetStudent.memberId && !targetStudent.docId && !targetStudent.name)) {
                 playAudioBeep('error');
                 showToast("Unrecognized QR Code token", "error");
                 setScannedModalData({
@@ -363,17 +433,18 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
             // STEP 4: DUPLICATE CHECK-IN (In-Memory attendance state + IndexedDB checkedIn store)
             const today = new Date().toISOString().split('T')[0];
             const targetPhone = String(targetStudent.phone || '').trim();
-            const targetEmp = String(targetStudent.employeeId || targetStudent.idNo || '').trim();
+            const targetEmp = String(targetStudent.employeeId || targetStudent.idNo || targetStudent.memberId || targetStudent.docId || '').trim();
+            const primaryId = targetEmp || targetPhone;
 
             const isAlreadyCheckedInState = attendance.some(a => {
                 if (a.date !== today) return false;
                 const aPhone = String(a.phone || '').trim();
-                const aEmp = String(a.employeeId || a.idNo || '').trim();
-                return (targetPhone && aPhone === targetPhone) || (targetEmp && aEmp === targetEmp);
+                const aEmp = String(a.employeeId || a.idNo || a.memberId || '').trim();
+                return (targetPhone && aPhone === targetPhone) || (primaryId && aEmp === primaryId);
             });
 
-            const isAlreadyCheckedInIDB = (await isAlreadyCheckedInLocal(targetPhone, today)) ||
-                                          (await isAlreadyCheckedInLocal(targetEmp, today));
+            const isAlreadyCheckedInIDB = (targetPhone ? await isAlreadyCheckedInLocal(targetPhone, today) : false) ||
+                                          (primaryId ? await isAlreadyCheckedInLocal(primaryId, today) : false);
 
             const isAlreadyCheckedIn = isAlreadyCheckedInState || isAlreadyCheckedInIDB;
 
@@ -392,16 +463,17 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
 
             // STEP 5: OPTIMISTIC UI RESPONSE & FIRESTORE WRITE / INDEXEDDB OFFLINE QUEUE
             playAudioBeep('success');
-            const docId = `${targetPhone || targetEmp}_${today}`;
+            const docId = `${primaryId}_${today}`;
             const adminIdentity = getAdminIdentity();
             const deviceInfoStr = typeof navigator !== 'undefined' ? navigator.userAgent : 'Desktop Browser';
 
             const recordData = {
                 studentName: targetStudent.name,
-                phone: targetStudent.phone,
-                employeeId: targetStudent.employeeId || targetStudent.idNo || targetStudent.phone,
-                idNo: targetStudent.employeeId || targetStudent.idNo || targetStudent.phone,
-                department: targetStudent.department || 'General',
+                phone: targetStudent.phone || '',
+                employeeId: primaryId,
+                idNo: targetStudent.idNo || primaryId,
+                memberId: targetStudent.memberId || primaryId,
+                department: targetStudent.department || 'Choir',
                 date: today,
                 scannedAt: new Date().toISOString(),
                 scannedBy: adminIdentity,
@@ -410,8 +482,8 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
             };
 
             // Mark locally in IndexedDB immediately to prevent double scanning offline or online
-            markCheckedInLocal(targetPhone, today, targetStudent.name);
-            if (targetEmp) markCheckedInLocal(targetEmp, today, targetStudent.name);
+            if (targetPhone) markCheckedInLocal(targetPhone, today, targetStudent.name);
+            if (primaryId) markCheckedInLocal(primaryId, today, targetStudent.name);
 
             if (getNetworkStatus()) {
                 showToast(`✅ Checked in: ${targetStudent.name}`);
@@ -458,8 +530,10 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
         }
 
         const dateToMark = customDate || new Date().toISOString().split('T')[0];
-        if (!window.confirm(`Manually check in ${student.name} for ${dateToMark}?`)) return;
-        const docId = `${student.phone}_${dateToMark}`;
+        const studentName = student.name || student.fullName || 'Attendee';
+        if (!window.confirm(`Manually check in ${studentName} for ${dateToMark}?`)) return;
+        const primaryId = student.employeeId || student.idNo || student.memberId || student.phone || student.docId;
+        const docId = `${primaryId}_${dateToMark}`;
         const docRef = doc(db, "attendance", docId);
 
         const adminIdentity = getAdminIdentity();
@@ -468,20 +542,23 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
         try {
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
-                showToast(`Already checked in: ${student.name} on ${dateToMark}`, "warning");
+                showToast(`Already checked in: ${studentName} on ${dateToMark}`, "warning");
                 return;
             }
             await setDoc(docRef, {
-                employeeId: student.employeeId || student.idNo || student.phone,
-                idNo: student.employeeId || student.idNo || student.phone,
-                department: student.department || 'General',
+                studentName: studentName,
+                phone: student.phone ? String(student.phone).trim() : '',
+                employeeId: primaryId,
+                idNo: student.idNo || primaryId,
+                memberId: student.memberId || primaryId,
+                department: student.department || 'Choir',
                 date: dateToMark,
                 scannedAt: serverTimestamp(),
                 scannedBy: adminIdentity,
                 deviceInfo: deviceInfoStr,
                 scannedLocation: null
             });
-            showToast(`✅ Manually Checked in: ${student.name}`);
+            showToast(`✅ Manually Checked in: ${studentName}`);
         } catch (e) {
             showToast("Error during check in", "error");
         }
@@ -803,6 +880,7 @@ const DashboardContent = ({ onLogout, showToast, toast, defaultTab }) => {
                                 }
                                 navigate('/register');
                             }}
+                            onImportSuccess={fetchStudents}
                         />
                     )}
                     {activeTab === 'date' && superAdmin && <AdminDateAnalysisTab students={students} attendance={attendance} />}

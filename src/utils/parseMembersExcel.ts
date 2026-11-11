@@ -81,22 +81,19 @@ export function normalizePhone(val: any): string {
 }
 
 /**
- * Detects standard headers from row values
+ * Detects standard headers from row values (Name, Gender, Group)
  */
 function identifyColumns(headers: string[]): {
     nameIdx: number;
     genderIdx: number;
-    phoneIdx: number;
     groupIdx: number;
 } {
     let nameIdx = -1;
     let genderIdx = -1;
-    let phoneIdx = -1;
     let groupIdx = -1;
 
     const nameAliases = ['name', 'full name', 'fullname', 'member name', 'ስም', 'ሙሉ ስም', 'ተማሪ ስም'];
     const genderAliases = ['gender', 'sex', 'ፆታ', 'ጾታ'];
-    const phoneAliases = ['phone', 'phone number', 'phonenumber', 'mobile', 'tel', 'telephone', 'ስልክ', 'ስልክ ቁጥር', 'ሞባይል'];
     const groupAliases = ['group', 'department', 'zone', 'team', 'ክፍል', 'ቡድን', 'ዘርፍ'];
 
     headers.forEach((rawHeader, idx) => {
@@ -107,8 +104,6 @@ function identifyColumns(headers: string[]): {
             nameIdx = idx;
         } else if (genderIdx === -1 && genderAliases.includes(h)) {
             genderIdx = idx;
-        } else if (phoneIdx === -1 && phoneAliases.includes(h)) {
-            phoneIdx = idx;
         } else if (groupIdx === -1 && groupAliases.includes(h)) {
             groupIdx = idx;
         }
@@ -127,18 +122,13 @@ function identifyColumns(headers: string[]): {
             return s.includes('gender') || s.includes('sex') || s.includes('ፆታ') || s.includes('ጾታ');
         });
     }
-    if (phoneIdx === -1) {
-        phoneIdx = headers.findIndex(h => {
-            const s = String(h || '').trim().toLowerCase();
-            return s.includes('phone') || s.includes('mobile') || s.includes('ስልክ');
-        });
-    }
 
-    return { nameIdx, genderIdx, phoneIdx, groupIdx };
+    return { nameIdx, genderIdx, groupIdx };
 }
 
 /**
  * Fetch set of existing members (name+gender keys) from Firestore for duplicate detection.
+ * Queries both `members` and `students` collections.
  */
 export async function fetchExistingMembersKeys(): Promise<Set<string>> {
     const existing = new Set<string>();
@@ -156,6 +146,22 @@ export async function fetchExistingMembersKeys(): Promise<Set<string>> {
     } catch (e) {
         console.warn('[parseMembersExcel] Failed to query existing members from Firestore:', e);
     }
+
+    try {
+        const studentsCol = collection(db, 'students');
+        const snapStudents = await getDocs(query(studentsCol, limit(2000)));
+        snapStudents.forEach(docSnap => {
+            const data = docSnap.data();
+            const name = data.fullName || data.name;
+            const gender = data.gender;
+            if (name && gender) {
+                existing.add(createDuplicateKey(name, gender));
+            }
+        });
+    } catch (e) {
+        console.warn('[parseMembersExcel] Failed to query existing students from Firestore:', e);
+    }
+
     return existing;
 }
 
@@ -194,7 +200,7 @@ export async function parseMembersExcel(
 
     // Header inspection
     const headerRow = rawRows[0].map(h => String(h || '').trim());
-    const { nameIdx, genderIdx, phoneIdx, groupIdx } = identifyColumns(headerRow);
+    const { nameIdx, genderIdx, groupIdx } = identifyColumns(headerRow);
 
     if (nameIdx === -1 || genderIdx === -1) {
         return {
@@ -235,12 +241,10 @@ export async function parseMembersExcel(
 
         const rawNameVal = row[nameIdx];
         const rawGenderVal = row[genderIdx];
-        const rawPhoneVal = phoneIdx !== -1 ? row[phoneIdx] : '';
         const rawGroupVal = groupIdx !== -1 ? row[groupIdx] : '';
 
         const fullName = normalizeName(rawNameVal);
         const gender = normalizeGender(rawGenderVal);
-        const phone = normalizePhone(rawPhoneVal);
         const group = normalizeName(rawGroupVal);
 
         let status: RowStatus = 'valid';
@@ -287,7 +291,7 @@ export async function parseMembersExcel(
             fullName,
             rawGender: String(rawGenderVal || ''),
             gender: gender || '',
-            phone,
+            phone: '',
             group,
             status,
             reason
@@ -309,12 +313,12 @@ export async function parseMembersExcel(
  * Generates an Excel template file (members-template.xlsx) and triggers a browser download.
  */
 export function downloadMembersTemplate(): void {
-    const headers = ['Name', 'Gender', 'Phone', 'Group'];
+    const headers = ['Name', 'Gender', 'Group'];
     const sampleRows = [
-        ['ዮናስ ታደሰ', 'ወንድ', '0911223344', 'Choir A'],
-        ['Sara Bekele', 'Female', '0922334455', 'Choir B'],
-        ['ተስፋዬ ገብሬ', 'Male', '0933445566', 'Choir A'],
-        ['ማርታ አለሙ', 'ሴት', '0944556677', 'Choir C']
+        ['ዮናስ ታደሰ', 'ወንድ', 'Choir A'],
+        ['Sara Bekele', 'Female', 'Choir B'],
+        ['ተስፋዬ ገብሬ', 'Male', 'Choir A'],
+        ['ማርታ አለሙ', 'ሴት', 'Choir C']
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
@@ -323,8 +327,7 @@ export function downloadMembersTemplate(): void {
     ws['!cols'] = [
         { wch: 30 }, // Name
         { wch: 15 }, // Gender
-        { wch: 18 }, // Phone
-        { wch: 18 }  // Group
+        { wch: 20 }  // Group
     ];
 
     const wb = XLSX.utils.book_new();
@@ -340,36 +343,36 @@ export function downloadMembersTemplate(): void {
  * 4. 1 duplicate
  * 5. 1 very long name
  */
-export const SAMPLE_10_ROWS: Array<[string, string, string, string]> = [
+export const SAMPLE_10_ROWS: Array<[string, string, string]> = [
     // 1. Amharic Name #1 (Valid)
-    ['ዮናስ ታደሰ', 'ወንድ', '0911223344', 'Choir A'],
+    ['ዮናስ ታደሰ', 'ወንድ', 'Choir A'],
     // 2. Amharic Name #2 (Valid)
-    ['ማርታ አለሙ', 'ሴት', '0922334455', 'Choir B'],
+    ['ማርታ አለሙ', 'ሴት', 'Choir B'],
     // 3. Invalid Gender (Invalid)
-    ['ዳዊት ከበደ', 'NotSpecified', '0933445566', 'Choir A'],
+    ['ዳዊት ከበደ', 'NotSpecified', 'Choir A'],
     // 4. Empty Name (Invalid)
-    ['   ', 'Female', '0944556677', 'Choir C'],
+    ['   ', 'Female', 'Choir C'],
     // 5. Duplicate of #1 (Duplicate)
-    ['ዮናስ ታደሰ', 'ወንድ', '0955667788', 'Choir A'],
+    ['ዮናስ ታደሰ', 'ወንድ', 'Choir A'],
     // 6. Very Long Name (Valid)
-    ['መርስኤሐዘን ወልደሚካኤል ተክለሃይማኖት ገብረእግዚአብሔር', 'Male', '0966778899', 'Honorary Choir'],
+    ['መርስኤሐዘን ወልደሚካኤል ተክለሃይማኖት ገብረእግዚአብሔር', 'Male', 'Honorary Choir'],
     // 7. English Valid
-    ['Samuel Tadesse', 'Male', '0977889900', 'Choir B'],
+    ['Samuel Tadesse', 'Male', 'Choir B'],
     // 8. English Valid
-    ['Bethlehem Haile', 'Female', '0988990011', 'Choir C'],
+    ['Bethlehem Haile', 'Female', 'Choir C'],
     // 9. Amharic Valid
-    ['አበበ ቢቂላ', 'ወንድ', '0912121212', 'Athletics & Choir'],
+    ['አበበ ቢቂላ', 'ወንድ', 'Athletics & Choir'],
     // 10. Amharic Valid
-    ['ብርቱካን ፀጋዬ', 'ሴት', '0923232323', 'Choir A']
+    ['ብርቱካን ፀጋዬ', 'ሴት', 'Choir A']
 ];
 
 /**
  * Generates and downloads the 10-Row test sample file as `sample-10-members-test.xlsx`.
  */
 export function downloadSampleTestExcel(): void {
-    const headers = ['Name', 'Gender', 'Phone', 'Group'];
+    const headers = ['Name', 'Gender', 'Group'];
     const ws = XLSX.utils.aoa_to_sheet([headers, ...SAMPLE_10_ROWS]);
-    ws['!cols'] = [{ wch: 45 }, { wch: 15 }, { wch: 18 }, { wch: 20 }];
+    ws['!cols'] = [{ wch: 45 }, { wch: 15 }, { wch: 20 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sample_Test');
     XLSX.writeFile(wb, 'sample-10-members-test.xlsx');
@@ -379,7 +382,7 @@ export function downloadSampleTestExcel(): void {
  * Converts array of rows into a sample ArrayBuffer for in-browser instant test preview.
  */
 export function createSampleTestBuffer(): ArrayBuffer {
-    const headers = ['Name', 'Gender', 'Phone', 'Group'];
+    const headers = ['Name', 'Gender', 'Group'];
     const ws = XLSX.utils.aoa_to_sheet([headers, ...SAMPLE_10_ROWS]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Test');
@@ -394,12 +397,11 @@ export function downloadImportReportCSV(
     rows: ParsedMemberRow[],
     filename = 'member-import-report.csv'
 ): void {
-    const headers = ['Row', 'Full Name', 'Gender', 'Phone', 'Group', 'Status', 'Assigned Member ID', 'Reason / Notes'];
+    const headers = ['Row', 'Full Name', 'Gender', 'Group', 'Status', 'Assigned Member ID', 'Reason / Notes'];
     const dataLines = rows.map(r => [
         r.rowNumber,
         `"${(r.fullName || r.rawName || '').replace(/"/g, '""')}"`,
         r.gender || r.rawGender || '',
-        r.phone || '',
         r.group || '',
         r.assignedId ? 'CREATED' : r.status.toUpperCase(),
         r.assignedId ? `${r.assignedId.display} (${r.assignedId.stored})` : 'N/A',

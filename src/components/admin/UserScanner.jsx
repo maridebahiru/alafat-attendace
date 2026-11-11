@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import defaultSupabase from '../../supabase/client';
+import { getStudentByIdentifier } from '../../utils/studentUtils';
 
 /**
  * UserScanner React Component with Direct ID Lookup & Modal Popup
@@ -96,10 +97,39 @@ const UserScanner = ({ supabase = defaultSupabase, currentUser }) => {
 
             if (data && data.length > 0) {
                 setSelectedUser(data[0]);
+                return;
+            }
+
+            // Fallback: Check Firestore students & members collections
+            const student = await getStudentByIdentifier(queryId);
+            if (student) {
+                setSelectedUser({
+                    id: student.employeeId || student.memberId || student.docId,
+                    email: student.phone || student.email || `${student.employeeId}@alafat.org`,
+                    form_id: student.idNo || student.memberId || student.employeeId,
+                    full_name: student.name || student.fullName,
+                    role: student.position || 'Singer',
+                    created_at: student.createdAt?.toDate ? student.createdAt.toDate().toISOString() : new Date().toISOString()
+                });
             } else {
                 setError(`No user found matching ID: "${queryId}"`);
             }
         } catch (err) {
+            // Check Firestore fallback in case Supabase threw connection error
+            try {
+                const student = await getStudentByIdentifier(queryId);
+                if (student) {
+                    setSelectedUser({
+                        id: student.employeeId || student.memberId || student.docId,
+                        email: student.phone || student.email || `${student.employeeId}@alafat.org`,
+                        form_id: student.idNo || student.memberId || student.employeeId,
+                        full_name: student.name || student.fullName,
+                        role: student.position || 'Singer',
+                        created_at: student.createdAt?.toDate ? student.createdAt.toDate().toISOString() : new Date().toISOString()
+                    });
+                    return;
+                }
+            } catch (fsErr) {}
             console.error("Direct ID lookup error:", err);
             setError(err.message || "Failed to lookup user ID.");
         } finally {

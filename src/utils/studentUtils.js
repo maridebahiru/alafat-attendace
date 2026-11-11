@@ -1,5 +1,5 @@
 import { db } from '../firebase/config';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
  * Generates an opaque random QR token.
@@ -47,93 +47,178 @@ export const cleanChristianName = (val) => {
  * If qrToken is missing, generates one and updates Firestore.
  * Returns the updated student object.
  */
+/**
+ * Ensures that the student document has a permanent qrToken.
+ * If qrToken is missing, generates one and updates Firestore.
+ * Returns the updated student object.
+ */
 export const ensureQrToken = async (student) => {
-  if (!student || !student.phone) return student;
+  if (!student) return student;
 
   if (student.qrToken) {
     return student;
   }
 
-  const newToken = generateQrToken();
+  const newToken = student.employeeId || student.memberId || student.idNo || generateQrToken();
+  const targetId = student.docId || student.phone || student.employeeId || student.memberId;
+  if (!targetId) return { ...student, qrToken: newToken };
+
   try {
-    const studentRef = doc(db, 'students', student.phone);
+    const studentRef = doc(db, 'students', targetId);
     await updateDoc(studentRef, { qrToken: newToken });
-    return { ...student, qrToken: newToken };
   } catch (err) {
-    console.error('Failed to update qrToken:', err);
-    return { ...student, qrToken: newToken };
+    try {
+      const memberRef = doc(db, 'members', targetId);
+      await updateDoc(memberRef, { qrToken: newToken });
+    } catch (e) {}
   }
+  return { ...student, qrToken: newToken };
 };
 
 /**
- * Searches for a student by Phone Number OR Employee/Student ID.
+ * Normalizes student or member Firestore data into standard student model.
+ * Does NOT invent dummy phones.
+ */
+const normalizeStudentDoc = (docSnap, collectionName) => {
+  const data = docSnap.data();
+  const primaryId = data.memberId || data.employeeId || data.idNo || docSnap.id;
+  const displayName = data.fullName || data.name || 'Member';
+  return {
+    docId: docSnap.id,
+    ...data,
+    name: displayName,
+    fullName: displayName,
+    gender: data.gender || '',
+    employeeId: primaryId,
+    idNo: data.idNo || primaryId,
+    memberId: data.memberId || primaryId,
+    phone: data.phone ? String(data.phone).trim() : '',
+    department: data.group || data.department || 'Choir',
+    position: data.position || 'Singer',
+    profilePhotoUrl: data.profilePhotoUrl || data.photoUrl || '',
+    qrToken: data.qrToken || primaryId,
+    sourceCollection: collectionName
+  };
+};
+
+/**
+ * Searches for a student or singer by Singer ID (e.g. "JY001", "JY 001"), Phone Number, or Token.
+ * Queries both `students` and `members` collections without requiring a phone number.
  */
 export const getStudentByIdentifier = async (identifier) => {
   if (!identifier) return null;
-  const term = String(identifier).trim();
+  const rawTerm = String(identifier).trim();
+  const cleanId = rawTerm.replace(/\s+/g, ''); // Collapses "JY 001" to "JY001"
 
-  // 1. Direct doc lookup by doc ID (most common: phone or student ID as doc ID)
-  try {
-    const phoneRef = doc(db, 'students', term);
-    const phoneSnap = await getDoc(phoneRef);
-    if (phoneSnap.exists()) {
-      const data = phoneSnap.data();
-      return { docId: phoneSnap.id, ...data, phone: data.phone || data.employeeId || phoneSnap.id };
-    }
-  } catch (e) {
-    // Direct doc lookup skipped
+  const termVariants = Array.from(new Set([
+    rawTerm,
+    cleanId,
+    rawTerm.toUpperCase(),
+    cleanId.toUpperCase(),
+    rawTerm.toLowerCase(),
+    cleanId.toLowerCase()
+  ])).filter(Boolean);
+
+  // 1. Direct doc lookup by doc ID in 'students'
+  for (const term of [cleanId, rawTerm, cleanId.toUpperCase(), rawTerm.toUpperCase()]) {
+    try {
+      const snap = await getDoc(doc(db, 'students', term));
+      if (snap.exists()) {
+        return normalizeStudentDoc(snap, 'students');
+      }
+    } catch (e) {}
   }
 
+  // 2. Direct doc lookup by doc ID in 'members'
+  for (const term of [cleanId, rawTerm, cleanId.toUpperCase(), rawTerm.toUpperCase()]) {
+    try {
+      const snap = await getDoc(doc(db, 'members', term));
+      if (snap.exists()) {
+        return normalizeStudentDoc(snap, 'members');
+      }
+    } catch (e) {}
+  }
+
+  // 3. Query 'students' collection across primary identifier fields
   const studentsCol = collection(db, 'students');
-
-  // 2. Query by employeeId field (primary student identifier)
-  try {
-    const empQuery = query(studentsCol, where('employeeId', '==', term));
-    const empDocs = await getDocs(empQuery);
-    if (!empDocs.empty) {
-      const docSnap = empDocs.docs[0];
-      const data = docSnap.data();
-      return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
+  for (const field of ['employeeId', 'idNo', 'memberId', 'qrToken']) {
+    for (const t of termVariants) {
+      try {
+        const q = query(studentsCol, where(field, '==', t), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          return normalizeStudentDoc(snap.docs[0], 'students');
+        }
+      } catch (e) {}
     }
-  } catch (e) {}
+  }
 
-  // 3. Query by phone field
-  try {
-    const phoneQuery = query(studentsCol, where('phone', '==', term));
-    const phoneDocs = await getDocs(phoneQuery);
-    if (!phoneDocs.empty) {
-      const docSnap = phoneDocs.docs[0];
-      const data = docSnap.data();
-      return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
+  // 4. Query 'members' collection across fields
+  const membersCol = collection(db, 'members');
+  for (const field of ['memberId', 'idNo', 'employeeId', 'qrToken']) {
+    for (const t of termVariants) {
+      try {
+        const q = query(membersCol, where(field, '==', t), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          return normalizeStudentDoc(snap.docs[0], 'members');
+        }
+      } catch (e) {}
     }
-  } catch (e) {}
+  }
 
-  // 4. Query by idNo field (fallback)
-  try {
-    const idNoQuery = query(studentsCol, where('idNo', '==', term));
-    const idNoDocs = await getDocs(idNoQuery);
-    if (!idNoDocs.empty) {
-      const docSnap = idNoDocs.docs[0];
-      const data = docSnap.data();
-      return { docId: docSnap.id, ...data, phone: data.phone || data.employeeId || docSnap.id };
-    }
-  } catch (e) {}
+  // 5. Query by phone number if identifier contains digits
+  if (/\d/.test(rawTerm)) {
+    try {
+      const qPhone = query(studentsCol, where('phone', '==', rawTerm), limit(1));
+      const snapPhone = await getDocs(qPhone);
+      if (!snapPhone.empty) {
+        return normalizeStudentDoc(snapPhone.docs[0], 'students');
+      }
+    } catch (e) {}
+
+    try {
+      const qMemPhone = query(membersCol, where('phone', '==', rawTerm), limit(1));
+      const snapMemPhone = await getDocs(qMemPhone);
+      if (!snapMemPhone.empty) {
+        return normalizeStudentDoc(snapMemPhone.docs[0], 'members');
+      }
+    } catch (e) {}
+  }
 
   return null;
 };
 
 /**
- * Searches for a student by permanent qrToken.
+ * Searches for a student or member by QR Token.
  */
 export const getStudentByQrToken = async (qrToken) => {
   if (!qrToken) return null;
-  const studentsCol = collection(db, 'students');
-  const tokenQuery = query(studentsCol, where('qrToken', '==', String(qrToken).trim()));
-  const tokenDocs = await getDocs(tokenQuery);
+  const token = cleanScannedToken(qrToken);
+  if (!token) return null;
 
-  if (!tokenDocs.empty) {
-    const docSnap = tokenDocs.docs[0];
-    return { phone: docSnap.id, ...docSnap.data() };
-  }
+  // Many QR codes contain the member ID directly (e.g. "JY001")
+  const direct = await getStudentByIdentifier(token);
+  if (direct) return direct;
+
+  const studentsCol = collection(db, 'students');
+  try {
+    const tokenQuery = query(studentsCol, where('qrToken', '==', token), limit(1));
+    const snap = await getDocs(tokenQuery);
+    if (!snap.empty) {
+      return normalizeStudentDoc(snap.docs[0], 'students');
+    }
+  } catch (e) {}
+
+  const membersCol = collection(db, 'members');
+  try {
+    const memTokenQuery = query(membersCol, where('qrToken', '==', token), limit(1));
+    const memSnap = await getDocs(memTokenQuery);
+    if (!memSnap.empty) {
+      return normalizeStudentDoc(memSnap.docs[0], 'members');
+    }
+  } catch (e) {}
+
   return null;
 };
+

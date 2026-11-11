@@ -15,8 +15,10 @@ const AdminUserManagementTab = ({ students, onAdd, onUpdate, onDelete }) => {
         const partner = s.partnerPhone ? students.find(st => st.phone === s.partnerPhone) : null;
         return { ...s, partnerName: partner ? partner.name : null };
     }).filter(s =>
-        (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s.phone || '').includes(searchTerm) ||
+        (s.name || s.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.phone && String(s.phone).includes(searchTerm)) ||
+        (s.employeeId && String(s.employeeId).toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (s.memberId && String(s.memberId).toLowerCase().includes(searchTerm.toLowerCase())) ||
         (s.idNo && String(s.idNo).toLowerCase().includes(searchTerm.toLowerCase()))
     ).sort((a, b) => {
         const getGroupSortName = (st) => {
@@ -214,7 +216,7 @@ const AdminUserManagementTab = ({ students, onAdd, onUpdate, onDelete }) => {
                                 const inGroup = isPartnerWithNext || isPartnerWithPrev;
 
                                 return (
-                                <React.Fragment key={s.phone}>
+                                <React.Fragment key={s.phone || s.employeeId || s.memberId || s.docId || i}>
                                     {isStartOfGroup && i !== 0 && <tr style={{ height: '24px' }}><td colSpan="4"></td></tr>}
                                     <tr 
                                         className="table-row-hover"
@@ -227,15 +229,15 @@ const AdminUserManagementTab = ({ students, onAdd, onUpdate, onDelete }) => {
                                         <td style={tdStyle}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: 'var(--accent-red)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-gold)', fontWeight: 'bold' }}>
-                                                    {s.name.charAt(0)}
+                                                    {(s.name || s.fullName || '?').charAt(0)}
                                                 </div>
                                                 <div>
-                                                    <div style={{ fontWeight: '600' }}>{s.name}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{s.phone}</div>
+                                                    <div style={{ fontWeight: '600' }}>{s.name || s.fullName}</div>
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{s.phone || 'No Phone'}</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td style={tdStyle}>{s.idNo || '—'}</td>
+                                        <td style={tdStyle}>{s.idNo || s.employeeId || s.memberId || '—'}</td>
                                         <td style={tdStyle}>
                                             {s.partnerPhone ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>

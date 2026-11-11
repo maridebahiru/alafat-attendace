@@ -28,9 +28,15 @@ const Dashboard = () => {
             return;
         }
 
-        // Real-time listener for student's attendance records
-        if (student.phone) {
-            const q = query(collection(db, "attendance"), where("phone", "==", student.phone));
+        // Real-time listener for student's attendance records (supports phone or employee ID)
+        const primaryId = student.employeeId || student.idNo || student.memberId;
+        const phone = student.phone ? String(student.phone).trim() : '';
+
+        const fieldToQuery = phone ? 'phone' : 'employeeId';
+        const valueToQuery = phone || primaryId;
+
+        if (valueToQuery) {
+            const q = query(collection(db, "attendance"), where(fieldToQuery, "==", valueToQuery));
             const unsub = onSnapshot(q, (snapshot) => {
                 const records = snapshot.docs.map(doc => doc.data());
                 records.sort((a, b) => (b.scannedAt?.seconds || 0) - (a.scannedAt?.seconds || 0));
@@ -155,9 +161,15 @@ const Dashboard = () => {
                             {/* Details Grid */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '14px' }}>
                                 <div>
-                                    <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>Phone</div>
+                                    <div style={{ opacity: 0.5, fontSize: '11px', textTransform: 'uppercase', marginBottom: '3px' }}>
+                                        {student.phone ? 'Phone' : 'Singer ID'}
+                                    </div>
                                     <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <Phone size={14} color="#d3a200" /> {student.phone}
+                                        {student.phone ? (
+                                            <><Phone size={14} color="#d3a200" /> {student.phone}</>
+                                        ) : (
+                                            <><IdCard size={14} color="#d3a200" /> {student.idNo || student.employeeId || student.memberId || 'N/A'}</>
+                                        )}
                                     </div>
                                 </div>
 

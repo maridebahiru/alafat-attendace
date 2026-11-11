@@ -100,7 +100,7 @@ const Login = () => {
                                 required
                                 value={identifier}
                                 onChange={(e) => setIdentifier(e.target.value)}
-                                placeholder="e.g. 0911223344 or EJAT-00"
+                                placeholder="e.g. 0911223344 or JY001 / JY 001"
                                 style={{
                                     width: '100%',
                                     padding: '14px 16px',

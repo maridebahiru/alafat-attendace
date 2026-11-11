@@ -26,27 +26,34 @@ const Generator = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         const cleanPhone = formData.phone.trim().replace(/[^\d+]/g, '');
-        if (cleanPhone.length < 10) {
+        const cleanId = formData.employeeId.trim();
+        if (!cleanPhone && !cleanId) {
+            alert("Please provide at least a Phone Number or Singer ID");
+            return;
+        }
+        if (cleanPhone && cleanPhone.length < 10) {
             alert("Phone number must be at least 10 digits");
             return;
         }
         setLoading(true);
 
         try {
+            const docId = cleanPhone || cleanId;
             const studentDoc = {
                 name: formData.name.trim(),
-                phone: cleanPhone,
-                employeeId: formData.employeeId.trim(),
-                idNo: formData.employeeId.trim() || cleanPhone,
-                department: formData.department.trim() || 'General',
-                position: formData.position.trim(),
+                phone: cleanPhone || '',
+                employeeId: cleanId || cleanPhone,
+                idNo: cleanId || cleanPhone,
+                memberId: cleanId || cleanPhone,
+                department: formData.department.trim() || 'Choir',
+                position: formData.position.trim() || 'Singer',
                 email: formData.email.trim(),
                 profilePhotoUrl: formData.profilePhotoUrl.trim(),
                 createdAt: serverTimestamp()
             };
 
-            // Upsert to Firestore using phone as doc ID
-            await setDoc(doc(db, "students", cleanPhone), studentDoc);
+            // Upsert to Firestore using docId
+            await setDoc(doc(db, "students", docId), studentDoc);
 
             // Ensure QR token exists
             const withToken = await ensureQrToken(studentDoc);
@@ -176,11 +183,12 @@ const Generator = () => {
                                 onClick={() => {
                                     setStudentData({
                                         name: m.fullName,
-                                        phone: m.phone || '0900000000',
+                                        phone: m.phone || '',
                                         employeeId: m.memberId,
                                         idNo: m.displayId || m.memberId,
+                                        memberId: m.memberId,
                                         department: m.group || 'Choir',
-                                        position: 'Member',
+                                        position: 'Singer',
                                         qrToken: m.memberId
                                     });
                                 }}

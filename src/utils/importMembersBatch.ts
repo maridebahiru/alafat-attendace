@@ -84,21 +84,33 @@ export async function importMembersToFirestore(
 
                 chunk.forEach(row => {
                     const memberId = row.assignedId!.stored;
-                    const docRef = doc(db, 'members', memberId);
+                    const displayId = row.assignedId!.display;
 
                     const data: Record<string, any> = {
+                        name: row.fullName,
                         fullName: row.fullName,
                         gender: row.gender,
                         photoUrl: null,
-                        idNo: row.assignedId!.display,
+                        profilePhotoUrl: '',
+                        idNo: displayId,
+                        employeeId: memberId,
                         memberId: memberId,
+                        phone: '',
+                        department: row.group ? row.group.trim() : 'Choir',
+                        position: 'Singer',
+                        qrToken: memberId,
                         createdAt: serverTimestamp(),
                         createdBy: adminUid
                     };
-                    if (row.phone) data.phone = row.phone;
-                    if (row.group) data.group = row.group;
 
-                    batch.set(docRef, data);
+                    // 1. Write to members collection: members/{memberId}
+                    const memberDocRef = doc(db, 'members', memberId);
+                    batch.set(memberDocRef, data);
+
+                    // 2. Dual-write to students collection: students/{memberId}
+                    // Guarantees all student directory, export, and check-in features recognize them immediately
+                    const studentDocRef = doc(db, 'students', memberId);
+                    batch.set(studentDocRef, data);
                 });
 
                 await batch.commit();
@@ -111,8 +123,8 @@ export async function importMembersToFirestore(
                         displayId: r.assignedId!.display,
                         fullName: r.fullName,
                         gender: r.gender,
-                        phone: r.phone,
-                        group: r.group
+                        phone: r.phone || '',
+                        group: r.group || ''
                     });
                 });
 

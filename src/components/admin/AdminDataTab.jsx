@@ -45,10 +45,18 @@ const AdminDataTab = ({
 
     // Filter & Aggregate data
     const filteredStudentsList = students.filter(s => {
-        const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            s.phone.includes(searchTerm) ||
-            (s.employeeId && s.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (s.idNo && s.idNo.toLowerCase().includes(searchTerm.toLowerCase()));
+        const studentName = String(s.name || s.fullName || '').toLowerCase();
+        const phone = String(s.phone || '');
+        const empId = String(s.employeeId || s.memberId || '').toLowerCase();
+        const idNo = String(s.idNo || '').toLowerCase();
+        const docId = String(s.docId || '').toLowerCase();
+        const term = searchTerm.toLowerCase();
+
+        const matchesSearch = studentName.includes(term) ||
+            (phone && phone.includes(term)) ||
+            empId.includes(term) ||
+            idNo.includes(term) ||
+            docId.includes(term);
 
         const dept = s.department || 'General';
         const matchesDept = selectedDepartment === 'All' || dept === selectedDepartment;
@@ -57,7 +65,14 @@ const AdminDataTab = ({
     });
 
     const aggregated = filteredStudentsList.map(s => {
-        let records = attendance.filter(a => a.phone === s.phone || a.employeeId === s.employeeId);
+        const targetPhone = String(s.phone || '').trim();
+        const targetEmp = String(s.employeeId || s.idNo || s.memberId || s.docId || '').trim();
+
+        let records = attendance.filter(a => {
+            const aPhone = String(a.phone || '').trim();
+            const aEmp = String(a.employeeId || a.idNo || a.memberId || '').trim();
+            return (targetPhone && aPhone === targetPhone) || (targetEmp && aEmp === targetEmp);
+        });
         if (startDate) records = records.filter(a => a.date >= startDate);
         if (endDate) records = records.filter(a => a.date <= endDate);
 
@@ -228,16 +243,20 @@ const AdminDataTab = ({
                                                 </div>
                                             )}
                                             <div>
-                                                <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{s.name}</div>
+                                                <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{s.name || s.fullName}</div>
                                                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <Phone size={10} /> {s.phone}
+                                                    {s.phone ? (
+                                                        <><Phone size={10} /> {s.phone}</>
+                                                    ) : (
+                                                        <span style={{ opacity: 0.5, fontStyle: 'italic' }}>No Phone</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
                                     <td style={tdStyle}>
                                         <span style={{ color: 'var(--accent-gold)', fontWeight: '700', backgroundColor: 'rgba(211, 162, 0, 0.1)', padding: '3px 8px', borderRadius: '6px', fontSize: '12px' }}>
-                                            {s.employeeId || s.idNo || 'N/A'}
+                                            {s.idNo || s.employeeId || s.memberId || 'N/A'}
                                         </span>
                                     </td>
                                     <td style={tdStyle}>

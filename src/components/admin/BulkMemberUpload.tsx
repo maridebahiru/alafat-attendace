@@ -14,9 +14,10 @@ import { useNavigate } from 'react-router-dom';
 
 interface BulkMemberUploadProps {
     onNavigateToGenerator?: (members?: CreatedMemberSummary[]) => void;
+    onImportSuccess?: () => void;
 }
 
-export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateToGenerator }) => {
+export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateToGenerator, onImportSuccess }) => {
     const navigate = useNavigate();
     const hasAdminAccess = isAdminOrSuperAdmin();
 
@@ -178,6 +179,10 @@ export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateTo
                 skippedCount: result.skippedCount,
                 createdMembers: result.createdMembers
             });
+
+            if (onImportSuccess) {
+                onImportSuccess();
+            }
         } catch (err: any) {
             console.error('Import execution error:', err);
             setImportError(err?.message || 'Error occurred during Firestore bulk writes.');
@@ -345,7 +350,7 @@ export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateTo
                         Supported formats: <strong style={{ color: 'var(--text-primary)' }}>.xlsx, .xls, .csv</strong> (Max 2,000 rows per batch).
                     </p>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '6px', opacity: 0.7 }}>
-                        Required columns: <strong style={{ color: 'var(--accent-gold)' }}>Name</strong> (or ስም) and <strong style={{ color: 'var(--accent-gold)' }}>Gender</strong> (or ፆታ). Optional: Phone, Group.
+                        Required columns: <strong style={{ color: 'var(--accent-gold)' }}>Name</strong> (or ስም) and <strong style={{ color: 'var(--accent-gold)' }}>Gender</strong> (or ፆታ). Optional: Group.
                     </p>
                 </div>
             )}
@@ -603,7 +608,6 @@ export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateTo
                                     <th style={{ padding: '14px 16px', color: 'var(--accent-gold)', fontWeight: '700' }}>Row</th>
                                     <th style={{ padding: '14px 16px', color: 'var(--accent-gold)', fontWeight: '700' }}>Full Name</th>
                                     <th style={{ padding: '14px 16px', color: 'var(--accent-gold)', fontWeight: '700' }}>Gender</th>
-                                    <th style={{ padding: '14px 16px', color: 'var(--accent-gold)', fontWeight: '700' }}>Phone</th>
                                     <th style={{ padding: '14px 16px', color: 'var(--accent-gold)', fontWeight: '700' }}>Group</th>
                                     <th style={{ padding: '14px 16px', color: 'var(--accent-gold)', fontWeight: '700' }}>Status</th>
                                     <th style={{ padding: '14px 16px', color: 'var(--accent-gold)', fontWeight: '700' }}>Notes / Reason</th>
@@ -612,7 +616,7 @@ export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateTo
                             <tbody>
                                 {paginatedRows.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        <td colSpan={6} style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                             No rows matching current filter "{filterStatus}".
                                         </td>
                                     </tr>
@@ -637,9 +641,6 @@ export const BulkMemberUpload: React.FC<BulkMemberUploadProps> = ({ onNavigateTo
                                                 </td>
                                                 <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>
                                                     {row.gender || <span style={{ color: '#ff4d4d' }}>{row.rawGender || 'Missing'}</span>}
-                                                </td>
-                                                <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
-                                                    {row.phone || '-'}
                                                 </td>
                                                 <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
                                                     {row.group || '-'}

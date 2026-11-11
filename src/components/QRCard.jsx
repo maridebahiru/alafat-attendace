@@ -143,10 +143,17 @@ const QRCard = forwardRef(({ studentData, logo }, ref) => {
                     </div>
                 </div>
 
-                <div style={{ marginBottom: '10px' }}>
-                    <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '11px' }}>Phone</label>
-                    <div style={{ color: '#65081b', fontSize: '14px', fontWeight: '600' }}>{phone}</div>
-                </div>
+                {phone ? (
+                    <div style={{ marginBottom: '10px' }}>
+                        <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '11px' }}>Phone</label>
+                        <div style={{ color: '#65081b', fontSize: '14px', fontWeight: '600' }}>{phone}</div>
+                    </div>
+                ) : (
+                    <div style={{ marginBottom: '10px' }}>
+                        <label style={{ display: 'block', color: '#65081b', fontWeight: '800', fontSize: '11px' }}>Department / Group</label>
+                        <div style={{ color: '#65081b', fontSize: '14px', fontWeight: '600' }}>{department || 'Choir'}</div>
+                    </div>
+                )}
 
                 {/* Spacer - Reduced to push content up */}
                 <div style={{ flexGrow: 1 }} />
