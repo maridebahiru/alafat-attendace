@@ -95,7 +95,7 @@ const Dashboard = () => {
                     </div>
                     <div>
                         <h1 style={{ color: '#d3a200', fontSize: '1.1rem', margin: 0, fontWeight: '800' }}>
-                            የኢትዮጵያዊው ጃንደረባ ትውልድ
+                            2019 Melody of Meridian
                         </h1>
                         <span style={{ fontSize: '12px', opacity: 0.7 }}>Singer Attendance Dashboard</span>
                     </div>
